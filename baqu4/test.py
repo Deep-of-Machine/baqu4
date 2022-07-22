@@ -141,6 +141,8 @@ def slide_window_search(binary_warped, left_current, right_current):
 
 
 def draw_lane_lines(original_image, warped_image, Minv, draw_info):
+    global pts_left, pts_right
+
     left_fitx = draw_info['left_fitx']
     right_fitx = draw_info['right_fitx']
     ploty = draw_info['ploty']
@@ -149,12 +151,13 @@ def draw_lane_lines(original_image, warped_image, Minv, draw_info):
     color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
 
     pts_left = np.array([np.transpose(np.vstack([left_fitx, ploty]))])
+    
     pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx, ploty])))])
     pts = np.hstack((pts_left, pts_right))
-
+    
     mean_x = np.mean((left_fitx, right_fitx), axis=0)
     pts_mean = np.array([np.flipud(np.transpose(np.vstack([mean_x, ploty])))])
-
+    
     cv2.fillPoly(color_warp, np.int_([pts]), (216, 168, 74))
     cv2.fillPoly(color_warp, np.int_([pts_mean]), (216, 168, 74))
 
@@ -164,48 +167,102 @@ def draw_lane_lines(original_image, warped_image, Minv, draw_info):
     return pts_mean, result
 
 
-while True:
-    retval, img = cap.read()
-    print(retval)
-    if not retval:
-        break
+def steering(speed=10):
+    center = 320
+    
+    target = (320, 240)
 
-    img = cv2.resize(img, dsize=(640, 480), interpolation=cv2.INTER_AREA)
+    # print(pts_left/center)
+    # print(pts_right/center)
+    
+    print("left: ", pts_left[0])
+    # print("right", pts_right)
+    # print(type(pts_left))
+    # print(len(pts_left))
+    pass
 
-    ## 조감도 wrapped img
-    wrapped_img, minverse = wrapping(img)
-    cv2.imshow('wrapped', wrapped_img)
 
-    ## 조감도 필터링
-    w_f_img = color_filter(wrapped_img)
-    # cv2.imshow('w_f_img', w_f_img)
+retval, img = cap.read()
+print(retval)
 
-    ##조감도 필터링 자르기
-    w_f_r_img = roi(w_f_img)
-    # cv2.imshow('w_f_r_img', w_f_r_img)
+img = cv2.resize(img, dsize=(640, 480), interpolation=cv2.INTER_AREA)
 
-    ## 조감도 선 따기 wrapped img threshold
-    _gray = cv2.cvtColor(w_f_r_img, cv2.COLOR_BGR2GRAY)
-    ret, thresh = cv2.threshold(_gray, 10, 255, cv2.THRESH_BINARY)
-    # cv2.imshow('threshold', thresh)
+## 조감도 wrapped img
+wrapped_img, minverse = wrapping(img)
+# cv2.imshow('wrapped', wrapped_img)
 
-    ## 선 분포도 조사 histogram
-    leftbase, rightbase = plothistogram(thresh)
-    # plt.plot(hist)
-    # plt.show()
+## 조감도 필터링
+w_f_img = color_filter(wrapped_img)
+# cv2.imshow('w_f_img', w_f_img)
 
-    ## histogram 기반 window roi 영역
-    draw_info = slide_window_search(thresh, leftbase, rightbase)
-    # plt.plot(left_fit)
-    # plt.show()
+##조감도 필터링 자르기
+w_f_r_img = roi(w_f_img)
+# cv2.imshow('w_f_r_img', w_f_r_img)
 
-    ## 원본 이미지에 라인 넣기
-    meanPts, result = draw_lane_lines(img, thresh, minverse, draw_info)
-    # cv2.imshow("result", result)
+## 조감도 선 따기 wrapped img threshold
+_gray = cv2.cvtColor(w_f_r_img, cv2.COLOR_BGR2GRAY)
+ret, thresh = cv2.threshold(_gray, 10, 255, cv2.THRESH_BINARY)
+# cv2.imshow('threshold', thresh)
 
-    key = cv2.waitKey(25)
-    if key == 27:
-        break
+## 선 분포도 조사 histogram
+leftbase, rightbase = plothistogram(thresh)
+# plt.plot(hist)
+# plt.show()
+
+## histogram 기반 window roi 영역
+draw_info = slide_window_search(thresh, leftbase, rightbase)
+# plt.plot(left_fit)
+# plt.show()
+
+## 원본 이미지에 라인 넣기
+meanPts, result = draw_lane_lines(img, thresh, minverse, draw_info)
+# cv2.imshow("result", result)
+steering()
+
+
+
+# while True:
+#     retval, img = cap.read()
+#     print(retval)
+#     if not retval:
+#         break
+
+#     img = cv2.resize(img, dsize=(640, 480), interpolation=cv2.INTER_AREA)
+
+#     ## 조감도 wrapped img
+#     wrapped_img, minverse = wrapping(img)
+#     # cv2.imshow('wrapped', wrapped_img)
+
+#     ## 조감도 필터링
+#     w_f_img = color_filter(wrapped_img)
+#     # cv2.imshow('w_f_img', w_f_img)
+
+#     ##조감도 필터링 자르기
+#     w_f_r_img = roi(w_f_img)
+#     # cv2.imshow('w_f_r_img', w_f_r_img)
+
+#     ## 조감도 선 따기 wrapped img threshold
+#     _gray = cv2.cvtColor(w_f_r_img, cv2.COLOR_BGR2GRAY)
+#     ret, thresh = cv2.threshold(_gray, 10, 255, cv2.THRESH_BINARY)
+#     # cv2.imshow('threshold', thresh)
+
+#     ## 선 분포도 조사 histogram
+#     leftbase, rightbase = plothistogram(thresh)
+#     # plt.plot(hist)
+#     # plt.show()
+
+#     ## histogram 기반 window roi 영역
+#     draw_info = slide_window_search(thresh, leftbase, rightbase)
+#     # plt.plot(left_fit)
+#     # plt.show()
+
+#     ## 원본 이미지에 라인 넣기
+#     meanPts, result = draw_lane_lines(img, thresh, minverse, draw_info)
+#     # cv2.imshow("result", result)
+
+#     key = cv2.waitKey(25)
+#     if key == 27:
+#         break
 
 if cap.isOpened():
     cap.release()
