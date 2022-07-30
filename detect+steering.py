@@ -1,9 +1,21 @@
+#!/usr/bin/env python
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+from std_msgs.msg import Float32
 
-cap = cv2.VideoCapture('test1.mp4')
+import rospy
+pub = rospy.Publisher('servo', Float32, queue_size=10000)
+rospy.init_node('detect+steering_18239_1659143527123', anonymous=True)
+rate = rospy.Rate(30) # 10hz
+    
 
+       
+        
+#rate.sleep()
+
+cap = cv2.VideoCapture('/home/hwb/catkin_ws/src/python_test/scripts/test1.mp4')
+#'/home/hwb/catkin_ws/src/python_test/scripts/test1.mp4'
 
 def color_filter(image):
     hls = cv2.cvtColor(image, cv2.COLOR_BGR2HLS)
@@ -177,12 +189,14 @@ def steering(speed=10):
     
     if lpc < rpc:
         angle = rpc - lpc
-        print("오른쪽으로: ", angle)
+        #print("오른쪽으로: ", angle)
     elif lpc > rpc:
         angle = lpc-rpc
-        print("왼쪽으로: ", angle)
+        #print("왼쪽으로: ", angle)
     else:
         pass
+        
+    return angle
     # print(target[1])
     # print(pts_left/center)
     # print(pts_right/center)
@@ -270,9 +284,8 @@ while True:
     ## 원본 이미지에 라인 넣기
     meanPts, result = draw_lane_lines(img, thresh, minverse, draw_info)
     # cv2.imshow("result", result)
-
-    steering()
-
+	
+    pub.publish(steering())
     key = cv2.waitKey(25)
     if key == 27:
         break
