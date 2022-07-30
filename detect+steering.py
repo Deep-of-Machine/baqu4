@@ -178,6 +178,8 @@ def draw_lane_lines(original_image, warped_image, Minv, draw_info):
 
     return pts_mean, result
 
+def map(x,input_min,input_max,output_min,output_max):
+    return (x-input_min)*(output_max-output_min)/(input_max-input_min)+output_min #map()함수 정의.
 
 def steering(speed=10):
     center = 320
@@ -188,14 +190,15 @@ def steering(speed=10):
     rpc = (pts_right[0][240][0]-320)/target[0] 
     
     if lpc < rpc:
-        angle = rpc - lpc
+        angle = (rpc - lpc)*100
         #print("오른쪽으로: ", angle)
     elif lpc > rpc:
-        angle = lpc-rpc
+        angle = -(lpc-rpc)*100 
         #print("왼쪽으로: ", angle)
     else:
         pass
-        
+    
+    angle = float(map(angle, -100, 100, 0, 180))
     return angle
     # print(target[1])
     # print(pts_left/center)
