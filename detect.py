@@ -17,24 +17,34 @@ import matplotlib.pyplot as plt
 px = (1920, 1080)
 
 outer = 90
-
+count = 0
 # 두번째 이전꺼로 저장, 현재는 그냥 저장하고 이와 다르면 모두 다 이상치
-
 def outer_control(x):
     global outer
-    if 45 < x < 135 :
+    if x < 45 or x > 135 :
         print('######### 절대 이상치 처리 ############')
     else:
-        if outer - 20 < x < outer + 20:
+        if outer - 15 < x < outer + 15:
             outer = x
             return x
         else:
-            outer = x
             print('######### 상대 이상치 처리 ############')
         
+def speed2angle(a):
+    s = 0
+    if s == 0:
+        return a
+    else:
+        if a < 90:
+            angle = 90 - ((90 - a) * (s/100))
+            return angle
+        elif a > 90:
+            angle = 90 + ((a - 90) * (s/100))
+            return angle
+        else:
+            print("speed2angle error")
         
-virtual_right_line = []
-virtual_left_line = []
+
 
 import math
 import numpy as np
@@ -47,7 +57,7 @@ def steering_theta(w1, w2):
         if w1 * w2 < 0:  #정방향 or 약간 틀어진 방향
             w1 = -w1
             angle = np.arctan(np.abs(math.tan(w1) - math.tan(w2)) / (1 + math.tan(w1)*math.tan(w2)))
-            theta = matching(angle, 0, np.pi/2, 90, 0)
+            theta = matching(angle, 0, np.pi/2, 90, 135)
         elif w1 * w2 > 0:  #극한으로 틀어진 방향
             if w1 > w2:
                 theta = 90
@@ -59,7 +69,7 @@ def steering_theta(w1, w2):
         if w1 * w2 < 0:  #정방향 or 약간 틀어진 방향
             w1 = -w1
             angle = np.arctan(np.abs(math.tan(w1) - math.tan(w2)) / (1 + math.tan(w1)*math.tan(w2)))
-            theta = matching(angle, 0, np.pi/2, 90, 180)
+            theta = matching(angle, 0, np.pi/2, 90, 45)
         elif w1 * w2 > 0:  #극한으로 틀어진 방향
             if w1 > w2:
                 theta = 90
@@ -73,12 +83,12 @@ def steering_theta(w1, w2):
     return theta
 
 def steering_vanishing_point(x):
-    standard_x = int(1920/2)
+    standard_x = int(px[0]/2)
     diff = standard_x - x 
     if diff > 0:   #좌회전
-        theta = matching(diff, 0, 1920/2, 90, 45)
+        theta = matching(diff, 0, px[0]/2, 90, 45)
     elif diff < 0:
-        theta = matching(diff, 0, -1920/2, 90, 135)
+        theta = matching(diff, 0, -px[0]/2, 90, 135)
 
     return theta
 
@@ -95,6 +105,16 @@ def detect(
         save_images=True,
         webcam=True
 ):
+    virtual_right_line = []
+    virtual_left_line = []
+
+    virtual_left_line.append(-0.65)    #-0.7
+    virtual_left_line.append(1050)   #950
+    virtual_left_line.append(-198)  #-394
+
+    virtual_right_line.append(0.65)  # 0.7
+    virtual_right_line.append(-200) #-500
+    virtual_right_line.append(1048)  #844
     
     device = torch_utils.select_device('mps:0')
     # device = torch.device('mps:0')
@@ -196,7 +216,6 @@ def detect(
 
             im0 = cv2.line(im0,(0, int(px[1]*(2/3))),(px[0],int(px[1]*(2/3))),(0,0,255),3)  # 정지선
             try:
-                ############ 한쪽 차선만 인식 ################
                 if len(right_line) > 1 and len(left_line) > 1:          ## 양쪽 차선이 다 있을때
                     for i in range(len(right_line)):
                         right_x.append(right_line[i][0])
@@ -229,15 +248,14 @@ def detect(
                     cv2.circle(im0, (int(cross_x), int(cross_y)), 10, (0, 0, 255), -1, cv2.LINE_AA)
 
                     if 80 < steering_theta(left_calculated_weight, right_calculated_weight) < 100:
-                        print('소실점 조향 서보모터 각도: ', outer_control(steering_vanishing_point(cross_x)))
+                        print('소실점 조향 서보모터 각도: ', speed2angle(outer_control(steering_vanishing_point(cross_x))))
                         
                     else:
-                        print("기울기 조향 서보모터 각도: ", outer_control(steering_theta(left_calculated_weight, right_calculated_weight)))
+                        print("기울기 조향 서보모터 각도: ", speed2angle(outer_control(steering_theta(left_calculated_weight, right_calculated_weight))))
 
 
                     ## 경험적 가상 차선 생성
-                    if 83 < steering_theta(left_calculated_weight, right_calculated_weight) < 93:
-                        #global virtual_weight
+                    if 80 < steering_theta(left_calculated_weight, right_calculated_weight) < 100 and 87 < steering_vanishing_point(cross_x) < 93:
                         virtual_right_line = []
                         virtual_left_line = []
                         virtual_left_line.append(left_calculated_weight)  # 기울기 저장
@@ -248,12 +266,11 @@ def detect(
                         virtual_right_line.append(right_calculated_weight)   
                         virtual_right_line.append(right_calculated_bias)
                         virtual_right_line.append(r_target)
+                        print('------------- 가상 차선 기울기 저장 ------------')
 
 
 
-
-
-
+                ############ 한쪽 차선만 인식 ################
 
                 elif len(right_line) > 1 and len(left_line) < 2:           ### 오른쪽 차선만 있을때
                     for i in range(len(right_line)):
@@ -280,9 +297,9 @@ def detect(
                         cv2.circle(im0, (int(cross_x), int(cross_y)), 10, (0, 0, 255), -1, cv2.LINE_AA)
 
                         if 80 < steering_theta(virtual_left_line[0], right_calculated_weight) < 100:
-                            print('오른쪽만; 소실점 조향 서보모터 각도: ', outer_control(steering_vanishing_point(cross_x)))
+                            print('오른쪽만; 소실점 조향 서보모터 각도: ', speed2angle(outer_control(steering_vanishing_point(cross_x))))
                         else:
-                            print("오른쪽만; 기울기 조향 서보모터 각도: ", outer_control(steering_theta(virtual_left_line[0], right_calculated_weight)))
+                            print("오른쪽만; 기울기 조향 서보모터 각도: ", speed2angle(outer_control(steering_theta(virtual_left_line[0], right_calculated_weight))))
                     
 
                 elif len(left_line) > 1 and len(right_line) < 2:             ### 왼쪽 차선만 있을때
@@ -309,26 +326,22 @@ def detect(
                         cv2.circle(im0, (int(cross_x), int(cross_y)), 10, (0, 0, 255), -1, cv2.LINE_AA)
 
                         if 80 < steering_theta(left_calculated_weight, virtual_right_line[0]) < 100:
-                            print('왼쪽만; 소실점 조향 서보모터 각도: ', outer_control(steering_vanishing_point(cross_x)))
+                            print('왼쪽만; 소실점 조향 서보모터 각도: ', speed2angle(outer_control(steering_vanishing_point(cross_x))))
                         else:
-                            print("왼쪽만; 기울기 조향 서보모터 각도: ", outer_control(steering_theta(left_calculated_weight, virtual_right_line[0])))
+                            print("왼쪽만; 기울기 조향 서보모터 각도: ", speed2angle(outer_control(steering_theta(left_calculated_weight, virtual_right_line[0]))))
 
                     
 
                 else:            ## 둘다 없을 떄
-                    if len(virtual_right_line) > 0:
-                        cross_x = (virtual_right_line[1] - left_calculated_bias) / (left_calculated_weight - virtual_right_line[0])
-                        cross_y = left_calculated_weight*((virtual_right_line[1] - left_calculated_bias)/(left_calculated_weight - virtual_right_line[0])) + left_calculated_bias
+                    cross_x = (virtual_right_line[1] - virtual_left_line[1]) / (virtual_left_line[0] - virtual_right_line[0])
+                    cross_y = virtual_left_line[0]*((virtual_right_line[1] - virtual_left_line[1])/(virtual_left_line[0] - virtual_right_line[0])) + virtual_left_line[1]
 
-                        # print(left_calculated_bias, l_target)
-                        im0 = cv2.line(im0,(0,int(left_calculated_bias)),(int(px[0]),int(l_target)),(0,0,0),10)
-                        im0 = cv2.line(im0,(int(0),int(virtual_right_line[1])),(px[0],int(virtual_right_line[2])),(0,0,0),10)
-                        cv2.circle(im0, (int(cross_x), int(cross_y)), 10, (0, 0, 255), -1, cv2.LINE_AA)
-
-                        if 80 < steering_theta(left_calculated_weight, virtual_right_line[0]) < 100:
-                            print('둘다 없음; 소실점 조향 서보모터 각도: ', outer_control(steering_vanishing_point(cross_x)))
-                        else:
-                            print("둘다 없음; 기울기 조향 서보모터 각도: ", outer_control(steering_theta(left_calculated_weight, virtual_right_line[0])))
+                    # print(left_calculated_bias, l_target)
+                    im0 = cv2.line(im0,(0,int(virtual_left_line[1])),(int(px[0]),int(virtual_left_line[2])),(0,0,0),10)
+                    im0 = cv2.line(im0,(int(0),int(virtual_right_line[1])),(px[0],int(virtual_right_line[2])),(0,0,0),10)
+                    cv2.circle(im0, (int(cross_x), int(cross_y)), 10, (0, 0, 255), -1, cv2.LINE_AA)
+                    
+                    print('둘다 없음; 소실점 조향 서보모터 각도: ', speed2angle(outer_control(steering_vanishing_point(cross_x))))
 
                 
                 ################# 정지 인식 #########################
@@ -387,9 +400,9 @@ if __name__ == '__main__':
     parser.add_argument('--cfg', type=str, default='cfg/yolov3.cfg', help='cfg file path')
     parser.add_argument('--weights', type=str, default='weights/best.pt', help='path to weights file')
     parser.add_argument('--images', type=str, default='data/samples', help='path to images')
-    parser.add_argument('--img-size', type=int, default=32*20, help='size of each image dimension') # best 32* 20                 #32*13
-    parser.add_argument('--conf-thres', type=float, default=0.1, help='object confidence threshold') #best!!!! 0.01                       #0.5
-    parser.add_argument('--nms-thres', type=float, default=0.01, help='iou threshold for non-maximum suppression') # 0.01         #0.45
+    parser.add_argument('--img-size', type=int, default=32*15, help='size of each image dimension') #32*10     # 32*20             best 32* 20                 #32*13
+    parser.add_argument('--conf-thres', type=float, default=0.035, help='object confidence threshold') #0.035    #  0.07              best!!!! 0.01                       #0.5
+    parser.add_argument('--nms-thres', type=float, default=0.001, help='iou threshold for non-maximum suppression')#0.001    #  0.001           0.01         #0.45
     opt = parser.parse_args()
     print(opt)
 
